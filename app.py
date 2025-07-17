@@ -13,9 +13,6 @@ pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
 # Input para que usuario elija nombre del PDF firmado (sin extensión)
 nombre_pdf = st.text_input("Nombre para guardar la Guía Firmada", "GUIA N°")
 
-# Variable zoom para oder hacer zoom desde la app subida a streamit cloud 
-tamano_zoom = st.slider("Zoom de vista previa", min_value=1, max_value=5, value=2)
-
 # Función para insertar la firma exactamente donde dice "Firma :"
 def insertar_firma_en_pdf(pdf_bytes, firma_img, firma_width=150):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -53,9 +50,10 @@ def insertar_firma_en_pdf(pdf_bytes, firma_img, firma_width=150):
     return output_pdf
 
 # Renderizar la última página del PDF como imagen
-def render_preview(pdf_bytes, zoom=2):
+def render_preview(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]
+    zoom = 6  #tamaño del docuemnto a mostrar
     mat = fitz.Matrix(zoom, zoom)
     pix = pagina.get_pixmap(matrix=mat)
     img_data = pix.tobytes("png")
@@ -67,7 +65,7 @@ if pdf_file is not None:
 
     # Vista previa antes de firmar
     st.subheader("Vista previa Documento:")
-    img_preview_before = render_preview(pdf_bytes, zoom=tamano_zoom) # para que se pueda hacer zoom desde la app
+    img_preview_before = render_preview(pdf_bytes) # para que se pueda hacer zoom desde la app
     st.image(img_preview_before, use_container_width=True)
 
     # Área de firma
