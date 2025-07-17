@@ -4,14 +4,14 @@ from PIL import Image
 import io
 import fitz  # PyMuPDF
 
-st.set_page_config(page_title="Firmar PDF con vista previa", layout="centered")
-st.title("Firmas Guías de Salida - Ingefix")
+st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
+st.title("Firmas Guías de Salida Ingefix")
 
 # Subir PDF
-pdf_file = st.file_uploader("📤 Sube tu archivo PDF", type=["pdf"])
+pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
 
 # Input para que usuario elija nombre del PDF firmado (sin extensión)
-nombre_pdf = st.text_input("Nombre para guardar el PDF (sin extensión)", "GUIA N°")
+nombre_pdf = st.text_input("Nombre para guardar la Guía Firmada (sin extensión)", "GUIA N°")
 
 # Función para insertar la firma exactamente donde dice "Firma :"
 def insertar_firma_en_pdf(pdf_bytes, firma_img, firma_width=150):
@@ -64,7 +64,7 @@ if pdf_file is not None:
     pdf_bytes = pdf_file.read()
 
     # Vista previa antes de firmar
-    st.subheader("👁️ Vista previa antes de firmar:")
+    st.subheader("Vista previa Documento:")
     img_preview_before = render_preview(pdf_bytes)
     st.image(img_preview_before, use_container_width=True)
 
@@ -87,21 +87,21 @@ if pdf_file is not None:
         signature_img = Image.fromarray((canvas_result.image_data).astype("uint8"))
 
     # Botón para firmar el PDF y descargar con nombre personalizado
-    if st.button("✅ Firmar PDF"):
+    if st.button("Firmar Documento"):
         if signature_img is None:
-            st.warning("⚠️ Dibuja tu firma primero.")
+            st.warning("Dibuja tu firma primero.")
         else:
             pdf_firmado_io = insertar_firma_en_pdf(pdf_bytes, signature_img)
-            st.success("🎉 PDF firmado correctamente.")
+            st.success("Documento firmado correctamente.")
 
             # Vista previa con firma (imagen)
-            st.subheader("👁️ Vista previa con firma:")
+            st.subheader("Vista previa Documento firmado:")
             img_preview_after = render_preview(pdf_firmado_io.getvalue())
             st.image(img_preview_after, use_container_width=True)
 
             # Botón para descargar con nombre personalizado
             st.download_button(
-                label="📥 Descargar PDF firmado",
+                label=" Descargar Documento Firmado",
                 data=pdf_firmado_io,
                 file_name=f"{nombre_pdf}.pdf",
                 mime="application/pdf"
