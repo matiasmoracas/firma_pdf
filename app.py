@@ -10,13 +10,26 @@ st.title("Firmas Guías de Salida Ingefix")
 # Subir PDF
 pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
 
+ # se agregan campos de la misma guia a rellenar
+nombre = st.text_input("Nombre")
+recinto = st.text_input("Recinto")
+fecha = st.text_input("Fecha")
+rut = st.text_input("RUT")
+
 # Input para que usuario elija nombre del PDF firmado (sin extensión)
 nombre_pdf = st.text_input("Nombre para guardar la Guía Firmada", "GUIA N°")
 
-# Función para insertar la firma exactamente donde dice "Firma :"
-def insertar_firma_en_pdf(pdf_bytes, firma_img, firma_width=150):
+
+# Función para insertar firma + texto
+def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha, rut, firma_width=150):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
+
+    # Insertar texto en posiciones específicas
+    pagina.insert_text((150, 685), nombre, fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.insert_text((150, 698), recinto, fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.insert_text((150, 708), fecha, fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.insert_text((450, 698),  rut, fontsize=12, fontname="helv", fill=(0, 0, 0))
 
     # Convertir firma a PNG
     img_byte_arr = io.BytesIO()
@@ -86,16 +99,20 @@ if pdf_file is not None:
     if canvas_result.image_data is not None:
         signature_img = Image.fromarray((canvas_result.image_data).astype("uint8"))
 
-    # Botón para firmar el PDF y descargar con nombre personalizado
+    # Botón para firmar y rellenar PDF
     if st.button("Firmar Documento"):
         if signature_img is None:
-            st.warning("Dibuja tu firma primero.")
+            st.warning("⚠️ Dibuja tu firma primero.")
+        elif not (nombre and recinto and fecha and rut):
+            st.warning("⚠️ Completa todos los campos de texto.")
         else:
-            pdf_firmado_io = insertar_firma_en_pdf(pdf_bytes, signature_img)
-            st.success("Documento firmado correctamente.")
+            pdf_firmado_io = insertar_firma_y_texto_en_pdf(
+                pdf_bytes, signature_img, nombre, recinto, fecha, rut
+            )
+            st.success("Documento completado correctamente.")
 
-            # Vista previa con firma (imagen)
-            st.subheader("Vista previa Documento firmado:")
+            # Vista previa final
+            st.subheader(" Vista previa con firma y datos:")
             img_preview_after = render_preview(pdf_firmado_io.getvalue())
             st.image(img_preview_after, use_container_width=True)
 
