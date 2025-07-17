@@ -53,10 +53,9 @@ def insertar_firma_en_pdf(pdf_bytes, firma_img, firma_width=150):
     return output_pdf
 
 # Renderizar la última página del PDF como imagen
-def render_preview(pdf_bytes):
+def render_preview(pdf_bytes, zoom=2):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]
-    zoom = 2
     mat = fitz.Matrix(zoom, zoom)
     pix = pagina.get_pixmap(matrix=mat)
     img_data = pix.tobytes("png")
