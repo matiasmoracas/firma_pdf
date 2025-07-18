@@ -6,6 +6,7 @@ import fitz  # PyMuPDF
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+import datetime
 
 st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
 st.title("Firmas Guías de Salida Ingefix")
@@ -16,22 +17,26 @@ pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
 # Campos de texto
 nombre = st.text_input("Nombre")
 recinto = st.text_input("Recinto")
-fecha = st.text_input("Fecha")
+fecha = st.date_input("Fecha", value=datetime.date.today())
+fecha_str = fecha.strftime("%d-%m-%Y")  
 rut = st.text_input("RUT")
 observacion = st.text_area("Observación") 
 
 # Nombre del archivo firmado
-nombre_pdf = st.text_input("Nombre para guardar la Guía Firmada", "GUIA N°")
+iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
+numero_guia = st.text_input("Número de la Guía", "")
+nombre_pdf = f"GUIA N {numero_guia} {iniciales_chofer}"
+
 
 # Función para insertar firma y texto
-def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha, rut, observacion, firma_width=150):
+def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=150):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
     # Insertar texto
     pagina.insert_text((150, 685), nombre, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((150, 698), recinto, fontsize=12, fontname="helv", fill=(0, 0, 0))
-    pagina.insert_text((150, 708), fecha, fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.insert_text((150, 708), fecha_str, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((450, 698),  rut, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.draw_rect(fitz.Rect(150, 730, 480, 790), color=(0.7, 0.7, 0.7), width=0.5)
     pagina.insert_text((80, 750), "Observación:", fontsize=12, fontname="helv", fill=(0, 0, 0))
