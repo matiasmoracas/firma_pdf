@@ -11,8 +11,6 @@ import datetime
 st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
 st.title("Firmas Guías de Salida Ingefix")
 
-if st.button("🔄 Recargar página"):
-    st.experimental_rerun()
 
 # Subir PDF
 pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
@@ -160,3 +158,5 @@ if pdf_file is not None:
                 file_name=f"{nombre_pdf}.pdf",
                 mime="application/pdf"
             )
+            if st.button("🔄 Recargar página"):
+               st.experimental_rerun()
