@@ -90,9 +90,10 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
 
     file_metadata = {
         "name": nombre_archivo,
-        "mimeType": "application/pdf"
+        "mimeType": "application/pdf",
+        "parents": ["1BRumpmlI5GlMHAB0xweEIerfaUwb4ceo"]
     }
-
+    contenido_pdf.seek(0)
     media = MediaIoBaseUpload(contenido_pdf, mimetype="application/pdf")
     archivo = servicio.files().create(body=file_metadata, media_body=media, fields="id").execute()
     return archivo.get("id")
