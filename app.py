@@ -139,7 +139,7 @@ if pdf_file is not None:
             st.warning("⚠️ Completa todos los campos de texto.")
         else:
             pdf_firmado_io = insertar_firma_y_texto_en_pdf(
-                pdf_bytes, signature_img, nombre, recinto, fecha, rut, observacion
+                pdf_bytes, signature_img, nombre, recinto, fecha_str, rut, observacion
             )
             st.success("✅ Documento completado correctamente.")
 
