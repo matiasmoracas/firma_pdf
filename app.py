@@ -109,9 +109,6 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     ).execute()
     return archivo.get("id")
 
-if st.button("🔄 Recargar página"):
-               st.experimental_rerun()
-
 # Procesamiento principal
 if pdf_file is not None:
     pdf_bytes = pdf_file.read()
@@ -155,6 +152,9 @@ if pdf_file is not None:
             st.subheader(" Vista previa con firma y datos:")
             img_preview_after = render_preview(pdf_firmado_io.getvalue())
             st.image(img_preview_after, use_container_width=True)
+
+            if st.button("🔄 Recargar página"):
+               st.experimental_rerun()
 
             st.download_button(
                 label=" Descargar Documento Firmado",
