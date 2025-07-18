@@ -15,13 +15,14 @@ nombre = st.text_input("Nombre")
 recinto = st.text_input("Recinto")
 fecha = st.text_input("Fecha")
 rut = st.text_input("RUT")
+observacion = st.text_area("Observación") 
 
 # Input para que usuario elija nombre del PDF firmado (sin extensión)
 nombre_pdf = st.text_input("Nombre para guardar la Guía Firmada", "GUIA N°")
 
 
 # Función para insertar firma + texto
-def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha, rut, firma_width=150):
+def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha, rut, observacion, firma_width=150):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
@@ -30,6 +31,17 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha, 
     pagina.insert_text((150, 698), recinto, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((150, 708), fecha, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((450, 698),  rut, fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.draw_rect(fitz.Rect(150, 730, 480, 790), color=(0.7, 0.7, 0.7), width=0.5)
+
+# Insertar el texto de la observación
+    pagina.insert_textbox(
+    fitz.Rect(150, 730, 480, 790),  # (x0, y0, x1, y1)
+    observacion,
+    fontsize=11,
+    fontname="helv",
+    fill=(0, 0, 0),
+    align=0  # alineación izquierda
+)
 
     # Convertir firma a PNG
     img_byte_arr = io.BytesIO()
@@ -107,7 +119,7 @@ if pdf_file is not None:
             st.warning("⚠️ Completa todos los campos de texto.")
         else:
             pdf_firmado_io = insertar_firma_y_texto_en_pdf(
-                pdf_bytes, signature_img, nombre, recinto, fecha, rut
+                pdf_bytes, signature_img, nombre, recinto, fecha, rut, observacion
             )
             st.success("Documento completado correctamente.")
 
