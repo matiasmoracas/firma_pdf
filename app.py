@@ -28,8 +28,6 @@ iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
 numero_guia = st.text_input("Número de la Guía", "")
 nombre_pdf = f"GUIA N {numero_guia} {iniciales_chofer}"
 
-if st.button("🔄 Recargar página"):
-               st.experimental_rerun()
 
 
 # Función para insertar firma y texto
@@ -110,6 +108,9 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
         supportsAllDrives=True   # <--- esto es muy importante para Shared Drives
     ).execute()
     return archivo.get("id")
+
+if st.button("🔄 Recargar página"):
+               st.experimental_rerun()
 
 # Procesamiento principal
 if pdf_file is not None:
