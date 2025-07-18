@@ -82,7 +82,6 @@ def render_preview(pdf_bytes):
     doc.close()
     return img_data
 
-# Subir a Google Drive
 def subir_a_drive(nombre_archivo, contenido_pdf):
     creds_info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(creds_info)
@@ -95,7 +94,12 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     }
     contenido_pdf.seek(0)
     media = MediaIoBaseUpload(contenido_pdf, mimetype="application/pdf")
-    archivo = servicio.files().create(body=file_metadata, media_body=media, fields="id").execute()
+    archivo = servicio.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id",
+        supportsAllDrives=True   # <--- esto es muy importante para Shared Drives
+    ).execute()
     return archivo.get("id")
 
 # Procesamiento principal
