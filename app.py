@@ -28,6 +28,9 @@ iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
 numero_guia = st.text_input("Número de la Guía", "")
 nombre_pdf = f"GUIA N {numero_guia} {iniciales_chofer}"
 
+if st.button("🔄 Recargar página"):
+               st.experimental_rerun()
+
 
 # Función para insertar firma y texto
 def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=150):
@@ -158,5 +161,4 @@ if pdf_file is not None:
                 file_name=f"{nombre_pdf}.pdf",
                 mime="application/pdf"
             )
-            if st.button("🔄 Recargar página"):
-               st.experimental_rerun()
+            
