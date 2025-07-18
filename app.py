@@ -91,7 +91,7 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     file_metadata = {
         "name": nombre_archivo,
         "mimeType": "application/pdf",
-        "parents": ["1BRumpmlI5GlMHAB0xweEIerfaUwb4ceo"]
+        "parents": ["0AFh4pnUAC83dUk9PVA"]
     }
     contenido_pdf.seek(0)
     media = MediaIoBaseUpload(contenido_pdf, mimetype="application/pdf")
