@@ -32,7 +32,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha, 
     pagina.insert_text((150, 708), fecha, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((450, 698),  rut, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.draw_rect(fitz.Rect(150, 730, 480, 790), color=(0.7, 0.7, 0.7), width=0.5)
-    pagina.insert_text((150, 730), "Observación:", fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.insert_text((150, 750), "Observación:", fontsize=12, fontname="helv", fill=(0, 0, 0))
 
 
 # Insertar el texto de la observación
