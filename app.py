@@ -26,7 +26,7 @@ observacion = st.text_area("Observación")
 # Nombre del archivo firmado
 iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
 numero_guia = st.text_input("Número de la Guía", "")
-nombre_pdf = f"GUIA N {numero_guia} {iniciales_chofer}"
+nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
 
 
 
