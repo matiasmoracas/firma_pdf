@@ -153,8 +153,6 @@ if pdf_file is not None:
             img_preview_after = render_preview(pdf_firmado_io.getvalue())
             st.image(img_preview_after, use_container_width=True)
 
-            if st.button("🔄 Recargar página"):
-               st.experimental_rerun()
 
             st.download_button(
                 label=" Descargar Documento Firmado",
