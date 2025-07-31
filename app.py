@@ -41,11 +41,11 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             y = box.y0 + offset_y
             pagina.insert_text((x, y), texto, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    # Insertar datos de texto ajustados hacia abajo
+    # Insertar datos de texto
     insertar_dato_campo("Nombre:", nombre)
     insertar_dato_campo("Recinto:", recinto)
     insertar_dato_campo("RUT:", rut)
-    insertar_dato_campo("Fecha:", fecha_str)
+    insertar_dato_campo("Fecha:", fecha_str, offset_y=8)  # <- ajuste especial
 
     # Insertar firma al lado de "Firma"
     firma_box = pagina.search_for("Firma")
