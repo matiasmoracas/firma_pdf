@@ -50,7 +50,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     if firma_box:
         rect = firma_box[0]
         x = rect.x0 + 60
-        y = rect.y0 - 40
+        y = rect.y0 - 20
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
