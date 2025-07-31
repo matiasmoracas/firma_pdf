@@ -26,13 +26,12 @@ iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
 numero_guia = st.text_input("Número de la Guía", "")
 nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
 
-
 # ================= FUNCIÓN PARA MODIFICAR EL PDF ====================
 def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=120):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
-    # Función auxiliar para insertar texto al lado de un campo buscado
+    # Func. auxiliar para insertar texto al lado de un campo
     def insertar_dato_campo(etiqueta, texto, offset_x=5, offset_y=4):
         resultados = pagina.search_for(etiqueta)
         if resultados:
@@ -41,18 +40,17 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             y = box.y0 + offset_y
             pagina.insert_text((x, y), texto, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    # Insertar datos
     insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
     insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
     insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
 
-    # Insertar firma en el cuadro de "Firma"
+    # Firma dentro del recuadro donde dice "Firma"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
-        x = rect.x0 + 50   # dentro del cuadro
-        y = rect.y0 - 10   # un poco más arriba para quedar alineado
+        x = rect.x0 + 50
+        y = rect.y0 - 10
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
@@ -66,20 +64,29 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
-    # Insertar observación con recuadro y etiqueta al lado
+    # Observación centrada debajo de CEDIBLE
     cedible_box = pagina.search_for("CEDIBLE")
     if cedible_box and observacion.strip():
         cbox = cedible_box[0]
-        ancho_texto = 280
-        alto_texto = 45
-        x_obs = cbox.x0 - 60
+        page_width = pagina.rect.width
         y_obs = cbox.y1 + 10
 
         # Etiqueta "Observación:"
-        pagina.insert_text((x_obs, y_obs + 5), "Observación:", fontsize=11, fontname="helv", fill=(0, 0, 0))
+        texto_label = "Observación:"
+        ancho_label = fitz.get_text_length(texto_label, fontsize=11, fontname="helv")
 
-        # Recuadro con el texto
-        textbox_rect = fitz.Rect(x_obs + 90, y_obs, x_obs + 90 + ancho_texto, y_obs + alto_texto)
+        ancho_campo = 280
+        alto_campo = 45
+        espacio = 10
+
+        total_ancho = ancho_label + espacio + ancho_campo
+        x_inicio = (page_width - total_ancho) / 2
+
+        # Insertar etiqueta
+        pagina.insert_text((x_inicio, y_obs + 5), texto_label, fontsize=11, fontname="helv", fill=(0, 0, 0))
+
+        # Recuadro con texto a la derecha de la etiqueta
+        textbox_rect = fitz.Rect(x_inicio + ancho_label + espacio, y_obs, x_inicio + ancho_label + espacio + ancho_campo, y_obs + alto_campo)
         pagina.draw_rect(textbox_rect, color=(0, 0, 0), width=0.5)
         pagina.insert_textbox(
             textbox_rect,
@@ -137,7 +144,6 @@ if pdf_file is not None:
     img_preview_before = render_preview(pdf_bytes)
     st.image(img_preview_before, use_container_width=True)
 
-    # Firma
     st.subheader("Dibuja tu firma aquí:")
     canvas_result = st_canvas(
         fill_color="rgba(0, 0, 0, 0)",
@@ -180,4 +186,5 @@ if pdf_file is not None:
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
+
 
