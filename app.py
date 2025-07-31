@@ -41,18 +41,18 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             y = box.y0 + offset_y
             pagina.insert_text((x, y), texto, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    # Insertar datos con ajustes de desplazamiento horizontal y vertical
+    # Insertar datos con ajustes de desplazamiento
     insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
     insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
-    insertar_dato_campo("Fecha:", fecha_str, offset_x=19, offset_y=8)
+    insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
 
-    # Insertar firma al lado de "Firma"
-    firma_box = pagina.search_for("Firma")
-    if firma_box:
-        rect = firma_box[0]
+    # Insertar firma debajo del campo "RUT:"
+    rut_box = pagina.search_for("RUT:")
+    if rut_box:
+        rect = rut_box[0]
         x = rect.x1 + 5
-        y = rect.y0 - 12  # buen ajuste visual
+        y = rect.y1 + 9  # 9 px debajo del RUT
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
@@ -175,4 +175,5 @@ if pdf_file is not None:
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
+
 
