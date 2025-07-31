@@ -36,7 +36,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     pagina = doc[-1]  # última página
 
     # Insertar texto
-    pagina.insert_text((150, 685), nombre, fontsize=12, fontname="helv", fill=(0, 0, 0))
+    pagina.insert_text((150, 660), nombre, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((150, 698), recinto, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((150, 708), fecha_str, fontsize=12, fontname="helv", fill=(0, 0, 0))
     pagina.insert_text((450, 698),  rut, fontsize=12, fontname="helv", fill=(0, 0, 0))
