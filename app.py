@@ -28,62 +28,64 @@ numero_guia = st.text_input("Número de la Guía", "")
 nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
 
 
-# ======= FUNCIÓN PARA INSERTAR TEXTO, FIRMA Y OBSERVACIÓN ===========
+# ======= FUNCIÓN PRINCIPAL PARA EDITAR EL PDF ===========
 def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=120):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
-    # Buscar "Nombre:" como ancla para datos principales
-    cajas = pagina.search_for("Nombre:")
-    if not cajas:
-        st.error("No se encontró 'Nombre:' en el PDF.")
-        return None
+    # Función auxiliar para insertar a la derecha de una etiqueta
+    def insertar_dato_derecha(texto_base, valor, offset_x=10, offset_y=0):
+        boxes = pagina.search_for(texto_base)
+        if boxes:
+            rect = boxes[0]
+            x = rect.x1 + offset_x
+            y = rect.y0 + offset_y
+            pagina.insert_text((x, y), valor, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    base = cajas[0]
-    x_inicio = base.x1 + 10
-    y_inicio = base.y0
-    salto_linea = 18
+    # Insertar campos de texto alineados con sus etiquetas
+    insertar_dato_derecha("Nombre:", nombre)
+    insertar_dato_derecha("Recinto:", recinto)
+    insertar_dato_derecha("RUT:", rut)
+    insertar_dato_derecha("Fecha:", fecha_str)
 
-    # Insertar datos
-    pagina.insert_text((x_inicio, y_inicio), nombre, fontsize=11, fill=(0, 0, 0))
-    pagina.insert_text((x_inicio, y_inicio + salto_linea), recinto, fontsize=11, fill=(0, 0, 0))
-    pagina.insert_text((x_inicio + 220, y_inicio + salto_linea), rut, fontsize=11, fill=(0, 0, 0))
-    pagina.insert_text((x_inicio, y_inicio + salto_linea * 2), fecha_str, fontsize=11, fill=(0, 0, 0))
+    # Insertar firma al lado de "Firma:"
+    firma_box = pagina.search_for("Firma")
+    if firma_box:
+        rect = firma_box[0]
+        x = rect.x1 + 10
+        y = rect.y0 - 10  # ajustar según alineación
 
-    # Insertar firma
-    img_byte_arr = io.BytesIO()
-    firma_img.save(img_byte_arr, format='PNG')
-    img_bytes = img_byte_arr.getvalue()
-    firma_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-    w_orig, h_orig = firma_pil.size
-    escala = firma_width / w_orig
-    h_escala = h_orig * escala
+        # Preparar imagen
+        img_byte_arr = io.BytesIO()
+        firma_img.save(img_byte_arr, format='PNG')
+        img_bytes = img_byte_arr.getvalue()
+        firma_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        w_orig, h_orig = firma_pil.size
+        escala = firma_width / w_orig
+        h_escala = h_orig * escala
 
-    x_firma = x_inicio + 220
-    y_firma = y_inicio + salto_linea * 2 - 5
-    rect = fitz.Rect(x_firma, y_firma, x_firma + firma_width, y_firma + h_escala)
-    pagina.insert_image(rect, stream=img_bytes)
+        firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
+        pagina.insert_image(firma_rect, stream=img_bytes)
 
     # Insertar Observación debajo de "CEDIBLE"
     cedible_box = pagina.search_for("CEDIBLE")
-    if cedible_box:
+    if cedible_box and observacion.strip():
         cbox = cedible_box[0]
         ancho_pagina = pagina.rect.width
-        ancho_texto = 330
-        alto_texto = 60
+        ancho_texto = 250
+        alto_texto = 40
         x_center = (ancho_pagina - ancho_texto) / 2
-        y_obs = cbox.y1 + 10  # debajo de CEDIBLE
+        y_obs = cbox.y1 + 10
 
         pagina.insert_textbox(
             fitz.Rect(x_center, y_obs, x_center + ancho_texto, y_obs + alto_texto),
-            observacion,
-            fontsize=11,
+            observacion.strip(),
+            fontsize=10,
             fontname="helv",
-            align=1,  # centrado
+            align=1,
             fill=(0, 0, 0)
         )
 
-    # Guardar PDF en memoria
     output = io.BytesIO()
     doc.save(output)
     doc.close()
@@ -91,7 +93,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     return output
 
 
-# Vista previa como imagen
+# Renderizar PDF como imagen
 def render_preview(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]
@@ -112,7 +114,7 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     file_metadata = {
         "name": nombre_archivo,
         "mimeType": "application/pdf",
-        "parents": ["0AFh4pnUAC83dUk9PVA"]  # carpeta destino
+        "parents": ["0AFh4pnUAC83dUk9PVA"]
     }
     contenido_pdf.seek(0)
     media = MediaIoBaseUpload(contenido_pdf, mimetype="application/pdf")
@@ -125,7 +127,7 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     return archivo.get("id")
 
 
-# ===================== PROCESAMIENTO PRINCIPAL =========================
+# ===================== INTERFAZ PRINCIPAL =========================
 if pdf_file is not None:
     pdf_bytes = pdf_file.read()
 
@@ -133,7 +135,7 @@ if pdf_file is not None:
     img_preview_before = render_preview(pdf_bytes)
     st.image(img_preview_before, use_container_width=True)
 
-    # Canvas para la firma
+    # Canvas para firma
     st.subheader("Dibuja tu firma aquí:")
     canvas_result = st_canvas(
         fill_color="rgba(0, 0, 0, 0)",
@@ -176,4 +178,3 @@ if pdf_file is not None:
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
-
