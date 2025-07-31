@@ -41,18 +41,18 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             y = box.y0 + offset_y
             pagina.insert_text((x, y), texto, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    # Insertar datos con ajustes de desplazamiento
+    # Insertar datos
     insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
     insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
     insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
 
-    # Insertar firma debajo del campo "RUT:"
-    rut_box = pagina.search_for("RUT:")
-    if rut_box:
-        rect = rut_box[0]
-        x = rect.x1 + 5
-        y = rect.y1 + 9  # 9 px debajo del RUT
+    # Insertar firma debajo de la palabra "Firma"
+    firma_box = pagina.search_for("Firma")
+    if firma_box:
+        rect = firma_box[0]
+        x = rect.x0 + 60  # hacia la derecha del texto "Firma"
+        y = rect.y1 + 3   # unos píxeles debajo del texto
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
@@ -66,7 +66,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
-    # Insertar observación centrada debajo de "CEDIBLE"
+    # Insertar observación debajo de "CEDIBLE"
     cedible_box = pagina.search_for("CEDIBLE")
     if cedible_box and observacion.strip():
         cbox = cedible_box[0]
