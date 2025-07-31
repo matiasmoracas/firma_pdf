@@ -14,7 +14,7 @@ st.title("Firmas Guías de Salida Ingefix")
 # Subir PDF
 pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
 
-# Campos de texto
+# Campos del formulario
 nombre = st.text_input("Nombre")
 recinto = st.text_input("Recinto")
 fecha = st.date_input("Fecha", value=datetime.date.today())
@@ -22,19 +22,18 @@ fecha_str = fecha.strftime("%d-%m-%Y")
 rut = st.text_input("RUT")
 observacion = st.text_area("Observación")
 
-# Nombre del archivo firmado
 iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
 numero_guia = st.text_input("Número de la Guía", "")
 nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
 
 
-# ======= FUNCIÓN PRINCIPAL PARA EDITAR EL PDF ===========
+# ================= FUNCIÓN PARA MODIFICAR EL PDF ====================
 def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=120):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
-    # Función auxiliar para insertar a la derecha de una etiqueta
-    def insertar_dato_derecha(texto_base, valor, offset_x=10, offset_y=0):
+    # Función auxiliar para insertar texto alineado
+    def insertar_dato_derecha(texto_base, valor, offset_x=5, offset_y=0):
         boxes = pagina.search_for(texto_base)
         if boxes:
             rect = boxes[0]
@@ -42,20 +41,19 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             y = rect.y0 + offset_y
             pagina.insert_text((x, y), valor, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    # Insertar campos de texto alineados con sus etiquetas
+    # Insertar datos alineados con sus etiquetas
     insertar_dato_derecha("Nombre:", nombre)
     insertar_dato_derecha("Recinto:", recinto)
-    insertar_dato_derecha("RUT:", rut)
-    insertar_dato_derecha("Fecha:", fecha_str)
+    insertar_dato_derecha("RUT:", rut, offset_y=-2)
+    insertar_dato_derecha("Fecha:", fecha_str, offset_y=2)
 
-    # Insertar firma al lado de "Firma:"
+    # Insertar firma alineada con "Firma:"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
-        x = rect.x1 + 10
-        y = rect.y0 - 10  # ajustar según alineación
+        x = rect.x1 + 5
+        y = rect.y0 - 20  # subido para buena alineación
 
-        # Preparar imagen
         img_byte_arr = io.BytesIO()
         firma_img.save(img_byte_arr, format='PNG')
         img_bytes = img_byte_arr.getvalue()
@@ -67,7 +65,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
-    # Insertar Observación debajo de "CEDIBLE"
+    # Insertar observación centrada debajo de "CEDIBLE"
     cedible_box = pagina.search_for("CEDIBLE")
     if cedible_box and observacion.strip():
         cbox = cedible_box[0]
@@ -75,7 +73,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         ancho_texto = 250
         alto_texto = 40
         x_center = (ancho_pagina - ancho_texto) / 2
-        y_obs = cbox.y1 + 10
+        y_obs = cbox.y1 + 5  # subir un poco respecto a antes
 
         pagina.insert_textbox(
             fitz.Rect(x_center, y_obs, x_center + ancho_texto, y_obs + alto_texto),
@@ -93,7 +91,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     return output
 
 
-# Renderizar PDF como imagen
+# =============== FUNCIONES ADICIONALES =====================
 def render_preview(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]
@@ -104,8 +102,6 @@ def render_preview(pdf_bytes):
     doc.close()
     return img_data
 
-
-# Subir a Google Drive
 def subir_a_drive(nombre_archivo, contenido_pdf):
     creds_info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(creds_info)
@@ -127,7 +123,7 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     return archivo.get("id")
 
 
-# ===================== INTERFAZ PRINCIPAL =========================
+# =================== INTERFAZ PRINCIPAL ====================
 if pdf_file is not None:
     pdf_bytes = pdf_file.read()
 
@@ -135,7 +131,7 @@ if pdf_file is not None:
     img_preview_before = render_preview(pdf_bytes)
     st.image(img_preview_before, use_container_width=True)
 
-    # Canvas para firma
+    # Firma
     st.subheader("Dibuja tu firma aquí:")
     canvas_result = st_canvas(
         fill_color="rgba(0, 0, 0, 0)",
