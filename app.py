@@ -47,12 +47,12 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
     insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
 
-    # Insertar firma debajo de la palabra "Firma"
+    # Insertar firma en el cuadro de "Firma"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
-        x = rect.x0 + 60  # hacia la derecha del texto "Firma"
-        y = rect.y1 + 3   # unos píxeles debajo del texto
+        x = rect.x0 + 50   # dentro del cuadro
+        y = rect.y0 - 10   # un poco más arriba para quedar alineado
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
@@ -66,22 +66,27 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
-    # Insertar observación debajo de "CEDIBLE"
+    # Insertar observación con recuadro y etiqueta al lado
     cedible_box = pagina.search_for("CEDIBLE")
     if cedible_box and observacion.strip():
         cbox = cedible_box[0]
-        ancho_pagina = pagina.rect.width
-        ancho_texto = 250
-        alto_texto = 40
-        x_center = (ancho_pagina - ancho_texto) / 2
-        y_obs = cbox.y1 + 5
+        ancho_texto = 280
+        alto_texto = 45
+        x_obs = cbox.x0 - 60
+        y_obs = cbox.y1 + 10
 
+        # Etiqueta "Observación:"
+        pagina.insert_text((x_obs, y_obs + 5), "Observación:", fontsize=11, fontname="helv", fill=(0, 0, 0))
+
+        # Recuadro con el texto
+        textbox_rect = fitz.Rect(x_obs + 90, y_obs, x_obs + 90 + ancho_texto, y_obs + alto_texto)
+        pagina.draw_rect(textbox_rect, color=(0, 0, 0), width=0.5)
         pagina.insert_textbox(
-            fitz.Rect(x_center, y_obs, x_center + ancho_texto, y_obs + alto_texto),
+            textbox_rect,
             observacion.strip(),
             fontsize=10,
             fontname="helv",
-            align=1,
+            align=0,
             fill=(0, 0, 0)
         )
 
@@ -175,5 +180,4 @@ if pdf_file is not None:
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
-
 
