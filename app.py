@@ -32,33 +32,34 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
-    # Función auxiliar para insertar texto alineado
-    def insertar_dato_derecha(texto_base, valor, offset_x=5, offset_y=0):
-        boxes = pagina.search_for(texto_base)
-        if boxes:
-            rect = boxes[0]
-            x = rect.x1 + offset_x
-            y = rect.y0 + offset_y
-            pagina.insert_text((x, y), valor, fontsize=11, fontname="helv", fill=(0, 0, 0))
+    # Función auxiliar para insertar texto al lado de un campo buscado
+    def insertar_dato_campo(etiqueta, texto, offset_x=5, offset_y=4):
+        resultados = pagina.search_for(etiqueta)
+        if resultados:
+            box = resultados[0]
+            x = box.x1 + offset_x
+            y = box.y0 + offset_y
+            pagina.insert_text((x, y), texto, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-    # Insertar datos alineados con sus etiquetas
-    insertar_dato_derecha("Nombre:", nombre)
-    insertar_dato_derecha("Recinto:", recinto)
-    insertar_dato_derecha("RUT:", rut, offset_y=-2)
-    insertar_dato_derecha("Fecha:", fecha_str, offset_y=2)
+    # Insertar datos de texto ajustados hacia abajo
+    insertar_dato_campo("Nombre:", nombre)
+    insertar_dato_campo("Recinto:", recinto)
+    insertar_dato_campo("RUT:", rut)
+    insertar_dato_campo("Fecha:", fecha_str)
 
-    # Insertar firma alineada con "Firma:"
+    # Insertar firma al lado de "Firma"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
         x = rect.x1 + 5
-        y = rect.y0 - 20  # subido para buena alineación
+        y = rect.y0 - 12  # buen ajuste visual
 
-        img_byte_arr = io.BytesIO()
-        firma_img.save(img_byte_arr, format='PNG')
-        img_bytes = img_byte_arr.getvalue()
-        firma_pil = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-        w_orig, h_orig = firma_pil.size
+        img_bytes = io.BytesIO()
+        firma_img.save(img_bytes, format='PNG')
+        img_bytes = img_bytes.getvalue()
+
+        image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        w_orig, h_orig = image.size
         escala = firma_width / w_orig
         h_escala = h_orig * escala
 
@@ -73,7 +74,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         ancho_texto = 250
         alto_texto = 40
         x_center = (ancho_pagina - ancho_texto) / 2
-        y_obs = cbox.y1 + 5  # subir un poco respecto a antes
+        y_obs = cbox.y1 + 5
 
         pagina.insert_textbox(
             fitz.Rect(x_center, y_obs, x_center + ancho_texto, y_obs + alto_texto),
