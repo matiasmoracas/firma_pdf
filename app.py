@@ -42,10 +42,10 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             pagina.insert_text((x, y), texto, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
     # Insertar datos con ajustes de desplazamiento horizontal y vertical
-    insertar_dato_campo("Nombre:", nombre, offset_x=10, offset_y=4)
-    insertar_dato_campo("Recinto:", recinto, offset_x=10, offset_y=7)
+    insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
+    insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
-    insertar_dato_campo("Fecha:", fecha_str, offset_x=10, offset_y=8)
+    insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
 
     # Insertar firma al lado de "Firma"
     firma_box = pagina.search_for("Firma")
