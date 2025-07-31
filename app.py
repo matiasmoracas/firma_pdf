@@ -43,7 +43,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
     insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
-    insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
+    insertar_dato_campo("Fecha:", fecha_str, offset_x=20, offset_y=8)
 
     # Firma dentro del recuadro donde dice "Firma"
     firma_box = pagina.search_for("Firma")
