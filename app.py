@@ -43,14 +43,14 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
     insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
-    insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
+    insertar_dato_campo("Fecha:", fecha_str, offset_x=20, offset_y=8)
 
     # Firma dentro del recuadro donde dice "Firma"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
-        x = rect.x0 + 50
-        y = rect.y0 - 10
+        x = rect.x0 + 20
+        y = rect.y0 - 40
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
@@ -96,14 +96,6 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             align=0,
             fill=(0, 0, 0)
         )
-
-    # Footer con crédito
-    footer_text = "Desarrollado por Ingefix 2025"
-    page_width = pagina.rect.width
-    page_height = pagina.rect.height
-    footer_x = (page_width - fitz.get_text_length(footer_text, fontsize=8, fontname="helv")) / 2
-    footer_y = page_height - 20
-    pagina.insert_text((footer_x, footer_y), footer_text, fontsize=8, fontname="helv", fill=(0.5, 0.5, 0.5))
 
     output = io.BytesIO()
     doc.save(output)
@@ -194,3 +186,10 @@ if pdf_file is not None:
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
+
+# Footer para la app
+st.markdown("""
+---
+<center style='color: gray;'>Desarrollado por Ingefix 2025</center>
+""", unsafe_allow_html=True)
+
