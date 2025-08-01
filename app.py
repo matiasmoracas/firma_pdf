@@ -15,11 +15,14 @@ st.title("Gestor de firmas Guías Ingefix")
 pdf_file = st.file_uploader("Sube La Guía de Salida", type=["pdf"])
 
 # Campos del formulario
+st.markdown("🧾 Formulario Cliente")
 nombre = st.text_input("Nombre")
 recinto = st.text_input("Recinto")
 fecha = st.date_input("Fecha", value=datetime.date.today())
 fecha_str = fecha.strftime("%d-%m-%Y")
 rut = st.text_input("RUT")
+
+st.markdown(" 🚚 Formulario Chofer / Despachador")
 observacion = st.text_area("Observación")
 
 iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
