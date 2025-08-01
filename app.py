@@ -14,27 +14,26 @@ st.title("Gestor de firmas Guías Ingefix")
 # Subir PDF
 pdf_file = st.file_uploader("Sube La Guía de Salida", type=["pdf"])
 
-# Campos del formulario
-st.markdown("🧾 Formulario Cliente")
-nombre = st.text_input("Nombre")
-recinto = st.text_input("Recinto")
-fecha = st.date_input("Fecha", value=datetime.date.today())
-fecha_str = fecha.strftime("%d-%m-%Y")
-rut = st.text_input("RUT")
+# ========== FORMULARIO CLIENTE ==========
+with st.expander("🧾 **Formulario Cliente**", expanded=True):
+    nombre = st.text_input("Nombre")
+    recinto = st.text_input("Recinto")
+    fecha = st.date_input("Fecha", value=datetime.date.today())
+    fecha_str = fecha.strftime("%d-%m-%Y")
+    rut = st.text_input("RUT")
 
-st.markdown(" 🚚 Formulario Chofer / Despachador")
-observacion = st.text_area("Observación")
-
-iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
-numero_guia = st.text_input("Número de la Guía", "")
-nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
+# ========== FORMULARIO CHOFER / DESPACHADOR ==========
+with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
+    observacion = st.text_area("Observación")
+    iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
+    numero_guia = st.text_input("Número de la Guía", "")
+    nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
 
 # ================= FUNCIÓN PARA MODIFICAR EL PDF ====================
 def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=120):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
-    # Func. auxiliar para insertar texto al lado de un campo
     def insertar_dato_campo(etiqueta, texto, offset_x=5, offset_y=4):
         resultados = pagina.search_for(etiqueta)
         if resultados:
@@ -48,7 +47,6 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
     insertar_dato_campo("Fecha:", fecha_str, offset_x=20, offset_y=8)
 
-    # Firma dentro del recuadro donde dice "Firma"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
@@ -67,14 +65,12 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
-    # Observación centrada debajo de CEDIBLE
     cedible_box = pagina.search_for("CEDIBLE")
     if cedible_box and observacion.strip():
         cbox = cedible_box[0]
         page_width = pagina.rect.width
         y_obs = cbox.y1 + 10
 
-        # Etiqueta "Observación:"
         texto_label = "Observación:"
         ancho_label = fitz.get_text_length(texto_label, fontsize=11, fontname="helv")
 
@@ -85,10 +81,8 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         total_ancho = ancho_label + espacio + ancho_campo
         x_inicio = (page_width - total_ancho) / 2
 
-        # Insertar etiqueta
         pagina.insert_text((x_inicio, y_obs + 5), texto_label, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-        # Recuadro con texto a la derecha de la etiqueta
         textbox_rect = fitz.Rect(x_inicio + ancho_label + espacio, y_obs, x_inicio + ancho_label + espacio + ancho_campo, y_obs + alto_campo)
         pagina.draw_rect(textbox_rect, color=(0, 0, 0), width=0.5)
         pagina.insert_textbox(
@@ -107,7 +101,6 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     return output
 
 
-# =============== FUNCIONES ADICIONALES =====================
 def render_preview(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]
@@ -139,7 +132,6 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     return archivo.get("id")
 
 
-# =================== INTERFAZ PRINCIPAL ====================
 if pdf_file is not None:
     pdf_bytes = pdf_file.read()
 
@@ -190,7 +182,6 @@ if pdf_file is not None:
                     mime="application/pdf"
                 )
 
-# Footer para la app
 st.markdown("""
 ---
 <center style='color: gray;'>Desarrollado por Ingefix 2025</center>
