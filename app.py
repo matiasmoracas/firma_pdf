@@ -43,14 +43,14 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     insertar_dato_campo("Nombre:", nombre, offset_x=15, offset_y=4)
     insertar_dato_campo("Recinto:", recinto, offset_x=15, offset_y=7)
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
-    insertar_dato_campo("Fecha:", fecha_str, offset_x=20, offset_y=8)
+    insertar_dato_campo("Fecha:", fecha_str, offset_x=15, offset_y=8)
 
     # Firma dentro del recuadro donde dice "Firma"
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
-        x = rect.x0 + 10
-        y = rect.y0 - 20
+        x = rect.x0 + 50
+        y = rect.y0 - 10
 
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
@@ -97,7 +97,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             fill=(0, 0, 0)
         )
 
-  # Footer con crédito
+    # Footer con crédito
     footer_text = "Desarrollado por Ingefix 2025"
     page_width = pagina.rect.width
     page_height = pagina.rect.height
@@ -110,6 +110,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     doc.close()
     output.seek(0)
     return output
+
 
 # =============== FUNCIONES ADICIONALES =====================
 def render_preview(pdf_bytes):
@@ -177,11 +178,11 @@ if pdf_file is not None:
                 pdf_bytes, signature_img, nombre, recinto, fecha_str, rut, observacion
             )
             if pdf_firmado_io:
-                st.success("Documento Firmado Correctamente.")
+                st.success("✅ Documento completado correctamente.")
 
                 with st.spinner("Subiendo a Google Drive..."):
                     drive_id = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io)
-                st.success(PDF subido con exito a Google Drive"
+                st.success(f"📤 PDF subido a Google Drive con ID: `{drive_id}`")
 
                 st.subheader("Vista previa del documento firmado:")
                 img_preview_after = render_preview(pdf_firmado_io.getvalue())
@@ -193,5 +194,3 @@ if pdf_file is not None:
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
-
-
