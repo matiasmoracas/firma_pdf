@@ -9,10 +9,10 @@ from googleapiclient.http import MediaIoBaseUpload
 import datetime
 
 st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
-st.title("Firmas Guías de Salida Ingefix")
+st.title("Gestor de firmas Guías Ingefix")
 
 # Subir PDF
-pdf_file = st.file_uploader("Subir La Guía de Salida", type=["pdf"])
+pdf_file = st.file_uploader("Sube La Guía de Salida", type=["pdf"])
 
 # Campos del formulario
 nombre = st.text_input("Nombre")
@@ -170,18 +170,18 @@ if pdf_file is not None:
                 pdf_bytes, signature_img, nombre, recinto, fecha_str, rut, observacion
             )
             if pdf_firmado_io:
-                st.success("✅ Documento completado correctamente.")
+                st.success("✅ Documento firmado correctamente.")
 
                 with st.spinner("Subiendo a Google Drive..."):
                     drive_id = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io)
-                st.success("PDF subido a Google Drive con éxito")
+                st.success("Documento enviado a Google Drive con éxito")
 
                 st.subheader("Vista previa del documento firmado:")
                 img_preview_after = render_preview(pdf_firmado_io.getvalue())
                 st.image(img_preview_after, use_container_width=True)
 
                 st.download_button(
-                    label="📥 Descargar Documento Firmado",
+                    label="Descargar Documento Firmado",
                     data=pdf_firmado_io,
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
