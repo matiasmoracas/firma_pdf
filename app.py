@@ -174,7 +174,7 @@ if pdf_file is not None:
 
                 with st.spinner("Subiendo a Google Drive..."):
                     drive_id = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io)
-                st.success(f"📤 PDF subido a Google Drive con ID: `{drive_id}`")
+                st.success("PDF subido a Google Drive con éxito")
 
                 st.subheader("Vista previa del documento firmado:")
                 img_preview_after = render_preview(pdf_firmado_io.getvalue())
