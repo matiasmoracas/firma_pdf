@@ -97,12 +97,19 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             fill=(0, 0, 0)
         )
 
+  # Footer con crédito
+    footer_text = "Desarrollado por Ingefix 2025"
+    page_width = pagina.rect.width
+    page_height = pagina.rect.height
+    footer_x = (page_width - fitz.get_text_length(footer_text, fontsize=8, fontname="helv")) / 2
+    footer_y = page_height - 20
+    pagina.insert_text((footer_x, footer_y), footer_text, fontsize=8, fontname="helv", fill=(0.5, 0.5, 0.5))
+
     output = io.BytesIO()
     doc.save(output)
     doc.close()
     output.seek(0)
     return output
-
 
 # =============== FUNCIONES ADICIONALES =====================
 def render_preview(pdf_bytes):
@@ -170,11 +177,11 @@ if pdf_file is not None:
                 pdf_bytes, signature_img, nombre, recinto, fecha_str, rut, observacion
             )
             if pdf_firmado_io:
-                st.success("✅ Documento completado correctamente.")
+                st.success("Documento Firmado Correctamente.")
 
                 with st.spinner("Subiendo a Google Drive..."):
                     drive_id = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io)
-                st.success(f"📤 PDF subido a Google Drive con ID: `{drive_id}`")
+                st.success(PDF subido con exito a Google Drive"
 
                 st.subheader("Vista previa del documento firmado:")
                 img_preview_after = render_preview(pdf_firmado_io.getvalue())
