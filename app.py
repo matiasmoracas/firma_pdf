@@ -67,8 +67,8 @@ with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
     nombre_pdf = f"GS {numero_guia} {iniciales_chofer}".strip()
 
 # ========== FOTO DEL RECINTO (SOLO CÁMARA) ==========
-with st.expander("📷 Foto del Recinto (opcional)", expanded=False):
-    st.markdown("Toma la foto aquí. Se comprimirá automáticamente con calidad fija en el backend.")
+with st.expander("📷 Foto del Recinto ", expanded=False):
+    st.markdown("Toma la foto aquí cambia la dirección de la cámara y luego presiona el boton **Take Photo**")
     cam_photo = st.camera_input("Usa la cámara del dispositivo", key="cam_recinto")
 
     # Preview de la cámara
