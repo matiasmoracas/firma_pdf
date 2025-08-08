@@ -8,6 +8,11 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import datetime
 
+# ====== PARÁMETROS FIJOS PARA LA FOTO (BACKEND) ======
+PHOTO_JPEG_QUALITY = 18   # más bajo = más compresión
+PHOTO_MAX_SIDE_PX = 720   # redimensiona el lado mayor
+PHOTO_WIDTH_PT = 400      # ancho en el PDF (pt)
+
 st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
 st.title("Gestor de firmas Guías Ingefix")
 
@@ -31,24 +36,23 @@ with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
 
 # ========== FOTO DEL RECINTO (OPCIONAL) ==========
 with st.expander("📷 Foto del Recinto (opcional)", expanded=False):
+    st.markdown("Puedes **subir una foto** o **tomarla con la cámara**. (Se comprime automáticamente con calidad fija en el backend).")
     foto_file = st.file_uploader("Sube una foto (JPG/PNG)", type=["jpg", "jpeg", "png"], key="foto_recinto")
-    calidad = st.slider("Calidad JPEG", 5, 50, 25, help="Menor = más compresión (menos KB)")
-    max_lado = st.select_slider("Máx. lado (px)", options=[480, 720, 1024, 1280, 1600], value=1024)
-    ancho_en_pdf = st.select_slider("Ancho de la foto en PDF (pt)", options=[240, 300, 360, 420], value=360,
-                                    help="1 pt ≈ 1/72 de pulgada. 360 pt ~ 12,7 cm")
-    if foto_file is not None:
-        st.image(foto_file, caption="Preview (original)", use_container_width=True)
+    cam_photo = st.camera_input("O toma la foto aquí (usa la cámara del dispositivo)", key="cam_recinto")
 
-# ================= HELPER: COMPRIMIR IMAGEN ====================
-def comprimir_imagen(file_bytes, max_lado=1024, calidad=25):
+    # Preview (prioridad a la cámara)
+    if cam_photo is not None:
+        st.image(cam_photo, caption="Preview (cámara)", use_container_width=True)
+    elif foto_file is not None:
+        st.image(foto_file, caption="Preview (archivo)", use_container_width=True)
+
+# ================= HELPER: COMPRIMIR IMAGEN (BACKEND) ====================
+def comprimir_imagen(file_bytes, max_lado=PHOTO_MAX_SIDE_PX, calidad=PHOTO_JPEG_QUALITY):
     """
-    - Redimensiona manteniendo aspecto hasta que el lado mayor sea <= max_lado
-    - Convierte a JPEG con alta compresión para pesar pocos KB
-    Devuelve BytesIO (JPEG) listo para incrustar en PDF.
+    Redimensiona (lado mayor <= max_lado) y comprime a JPEG.
+    Sin controles en UI; parámetros fijos arriba.
     """
     img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-
-    # Redimensionar manteniendo proporción si supera el máximo
     w, h = img.size
     scale = min(max_lado / max(w, h), 1.0)
     if scale < 1.0:
@@ -70,12 +74,11 @@ def insertar_firma_y_texto_en_pdf(
     observacion,
     firma_width=120,
     foto_jpeg_bytes=None,
-    foto_ancho_pt=360,
+    foto_ancho_pt=PHOTO_WIDTH_PT,
+    fecha_hora_foto=None
 ):
     """
-    Si 'foto_jpeg_bytes' viene, inserta la foto:
-      - Primero intenta debajo de la sección 'Observación:' en la última página.
-      - Si no hay espacio suficiente, agrega una nueva página y la centra arriba.
+    Inserta firma, textos y opcionalmente una foto (con rótulo de fecha/hora).
     """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
@@ -99,16 +102,13 @@ def insertar_firma_y_texto_en_pdf(
         rect = firma_box[0]
         x = rect.x0 + 10
         y = rect.y0 - 20
-
         img_bytes = io.BytesIO()
         firma_img.save(img_bytes, format='PNG')
         img_bytes = img_bytes.getvalue()
-
         image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
         w_orig, h_orig = image.size
         escala = firma_width / w_orig
         h_escala = h_orig * escala
-
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
@@ -119,83 +119,63 @@ def insertar_firma_y_texto_en_pdf(
         cbox = cedible_box[0]
         page_width = pagina.rect.width
         y_obs = cbox.y1 + 10
-
         texto_label = "Observación:"
         ancho_label = fitz.get_text_length(texto_label, fontsize=11, fontname="helv")
-
         ancho_campo = 280
         alto_campo = 45
         espacio = 10
-
         total_ancho = ancho_label + espacio + ancho_campo
         x_inicio = (page_width - total_ancho) / 2
-
         pagina.insert_text((x_inicio, y_obs + 5), texto_label, fontsize=11, fontname="helv", fill=(0, 0, 0))
-
         textbox_rect = fitz.Rect(
-            x_inicio + ancho_label + espacio,
-            y_obs,
-            x_inicio + ancho_label + espacio + ancho_campo,
-            y_obs + alto_campo
+            x_inicio + ancho_label + espacio, y_obs,
+            x_inicio + ancho_label + espacio + ancho_campo, y_obs + alto_campo
         )
         pagina.draw_rect(textbox_rect, color=(0, 0, 0), width=0.5)
-        pagina.insert_textbox(
-            textbox_rect,
-            observacion.strip(),
-            fontsize=10,
-            fontname="helv",
-            align=0,
-            fill=(0, 0, 0)
-        )
-        y_obs_base = textbox_rect.y1  # parte baja del recuadro de observación
+        pagina.insert_textbox(textbox_rect, observacion.strip(), fontsize=10, fontname="helv", align=0, fill=(0, 0, 0))
+        y_obs_base = textbox_rect.y1
 
-    # Foto (opcional) — intentamos en la última página
+    # Foto (opcional)
     if foto_jpeg_bytes is not None:
         try:
-            # Calcula alto manteniendo aspecto a partir del ancho deseado (en pt)
             img_tmp = Image.open(io.BytesIO(foto_jpeg_bytes))
             wpx, hpx = img_tmp.size
             ratio = hpx / wpx if wpx else 1
-            alto_pt = foto_ancho_pt * ratio
-
             margen = 36  # 0.5"
             page_width = pagina.rect.width
             page_height = pagina.rect.height
+            ancho_pt = max(min(foto_ancho_pt, page_width - 2 * margen), 120)
+            alto_pt = ancho_pt * ratio
 
-            # Posición preferida: debajo de observación si existe, sino debajo de 'CEDIBLE', sino centro/abajo
-            y_start = None
+            # posición preferida
             if y_obs_base is not None:
-                y_start = y_obs_base + 12
+                y_start = y_obs_base + 26  # espacio para el rótulo
             elif cedible_box:
-                y_start = cedible_box[0].y1 + 20
+                y_start = cedible_box[0].y1 + 34
             else:
-                y_start = page_height * 0.55  # aproximación si no hay anclaje
+                y_start = page_height * 0.55
 
-            # Centrado horizontal
-            x_left = max((page_width - foto_ancho_pt) / 2, margen)
-            x_right = min(x_left + foto_ancho_pt, page_width - margen)
-            # recalcula por si ajustamos a margen derecho
-            foto_ancho_pt_real = x_right - x_left
-            alto_pt_real = foto_ancho_pt_real * ratio
+            x_left = max((page_width - ancho_pt) / 2, margen)
+            x_right = min(x_left + ancho_pt, page_width - margen)
+            ancho_pt_real = x_right - x_left
+            alto_pt_real = ancho_pt_real * ratio
 
-            # ¿Cabe en esta página?
+            # rótulo
+            etiqueta = f"Foto del recinto — {fecha_hora_foto}" if fecha_hora_foto else "Foto del recinto"
+            pagina.insert_text((x_left, y_start - 12), etiqueta, fontsize=10, fontname="helv", fill=(0, 0, 0))
+
             if y_start + alto_pt_real + margen <= page_height:
-                target_rect = fitz.Rect(x_left, y_start, x_left + foto_ancho_pt_real, y_start + alto_pt_real)
+                target_rect = fitz.Rect(x_left, y_start, x_left + ancho_pt_real, y_start + alto_pt_real)
                 pagina.insert_image(target_rect, stream=foto_jpeg_bytes)
             else:
-                # Crear nueva página y centrar arriba con márgenes
-                new_page = doc.new_page(-1)  # al final
+                new_page = doc.new_page(-1)
                 pw, ph = new_page.rect.width, new_page.rect.height
-                x_left = max((pw - foto_ancho_pt) / 2, margen)
-                x_right = min(x_left + foto_ancho_pt, pw - margen)
-                foto_ancho_pt_real = x_right - x_left
-                alto_pt_real = foto_ancho_pt_real * ratio
-                y_top = margen
-                target_rect = fitz.Rect(x_left, y_top, x_left + foto_ancho_pt_real, y_top + alto_pt_real)
+                x_left = max((pw - ancho_pt) / 2, margen)
+                alto_pt_real = ancho_pt * ratio
+                new_page.insert_text((x_left, margen - 12), etiqueta, fontsize=10, fontname="helv", fill=(0, 0, 0))
+                target_rect = fitz.Rect(x_left, margen, x_left + ancho_pt, margen + alto_pt_real)
                 new_page.insert_image(target_rect, stream=foto_jpeg_bytes)
-
         except Exception as e:
-            # No rompemos el flujo si falla la foto
             print("Error insertando foto en PDF:", e)
 
     # Salida
@@ -215,25 +195,14 @@ def render_preview(pdf_bytes):
     doc.close()
     return img_data
 
-# ================= SUBIDA A DRIVE (PDF ÚNICO) ====================
-def subir_a_drive(nombre_archivo, contenido_io, mime_type="application/pdf", parent_id="0AFh4pnUAC83dUk9PVA"):
+def subir_a_drive(nombre_archivo, contenido_pdf):
     creds_info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(creds_info)
     servicio = build("drive", "v3", credentials=credentials)
-
-    file_metadata = {
-        "name": nombre_archivo,
-        "mimeType": mime_type,
-        "parents": [parent_id],
-    }
-    contenido_io.seek(0)
-    media = MediaIoBaseUpload(contenido_io, mimetype=mime_type)
-    archivo = servicio.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id",
-        supportsAllDrives=True
-    ).execute()
+    file_metadata = {"name": nombre_archivo, "mimeType": "application/pdf", "parents": ["0AFh4pnUAC83dUk9PVA"]}
+    contenido_pdf.seek(0)
+    media = MediaIoBaseUpload(contenido_pdf, mimetype="application/pdf")
+    archivo = servicio.files().create(body=file_metadata, media_body=media, fields="id", supportsAllDrives=True).execute()
     return archivo.get("id")
 
 # ================= UI PRINCIPAL ====================
@@ -241,19 +210,12 @@ if pdf_file is not None:
     pdf_bytes = pdf_file.read()
 
     st.subheader("Vista previa del documento original:")
-    img_preview_before = render_preview(pdf_bytes)
-    st.image(img_preview_before, use_container_width=True)
+    st.image(render_preview(pdf_bytes), use_container_width=True)
 
     st.subheader("Dibuja tu firma aquí:")
     canvas_result = st_canvas(
-        fill_color="rgba(0, 0, 0, 0)",
-        stroke_width=2,
-        stroke_color="black",
-        background_color="#ffffff00",
-        height=150,
-        width=400,
-        drawing_mode="freedraw",
-        key="canvas"
+        fill_color="rgba(0, 0, 0, 0)", stroke_width=2, stroke_color="black",
+        background_color="#ffffff00", height=150, width=400, drawing_mode="freedraw", key="canvas"
     )
 
     signature_img = None
@@ -266,46 +228,39 @@ if pdf_file is not None:
         elif not (nombre and recinto and fecha and rut and numero_guia):
             st.warning("⚠️ Completa todos los campos del formulario.")
         else:
-            # Comprimir foto si viene
+            # bytes de la foto: cámara > archivo
+            foto_bytes_raw = cam_photo.getvalue() if cam_photo is not None else (foto_file.read() if foto_file is not None else None)
+
+            # comprimir (backend, fijo)
             foto_jpeg_bytes = None
-            if foto_file is not None:
+            if foto_bytes_raw is not None:
                 try:
-                    foto_jpeg_io = comprimir_imagen(foto_file.read(), max_lado=max_lado, calidad=calidad)
+                    foto_jpeg_io = comprimir_imagen(foto_bytes_raw)
                     foto_jpeg_bytes = foto_jpeg_io.getvalue()
-                    st.info(f"Foto comprimida lista para incrustar (≈ {len(foto_jpeg_bytes)//1024} KB).")
                 except Exception as e:
                     st.error(f"No se pudo comprimir la foto: {e}")
 
-            # Construir PDF final (firma + textos + foto incrustada)
+            fecha_hora_foto = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+
+            # construir PDF final
             pdf_final_io = insertar_firma_y_texto_en_pdf(
-                pdf_bytes=pdf_bytes,
-                firma_img=signature_img,
-                nombre=nombre,
-                recinto=recinto,
-                fecha_str=fecha_str,
-                rut=rut,
-                observacion=observacion,
-                firma_width=120,
-                foto_jpeg_bytes=foto_jpeg_bytes,
-                foto_ancho_pt=ancho_en_pdf,
+                pdf_bytes=pdf_bytes, firma_img=signature_img, nombre=nombre, recinto=recinto,
+                fecha_str=fecha_str, rut=rut, observacion=observacion, firma_width=120,
+                foto_jpeg_bytes=foto_jpeg_bytes, foto_ancho_pt=PHOTO_WIDTH_PT, fecha_hora_foto=fecha_hora_foto
             )
 
             if pdf_final_io:
                 st.success("✅ Documento firmado y foto incrustada correctamente.")
-
-                with st.spinner("Subiendo PDF a Google Drive..."):
-                    drive_id_pdf = subir_a_drive(f"{nombre_pdf}.pdf", pdf_final_io, mime_type="application/pdf")
-                st.success("📄 PDF enviado a Google Drive con éxito.")
+                with st.spinner("Subiendo a Google Drive..."):
+                    subir_a_drive(f"{nombre_pdf}.pdf", pdf_final_io)
+                st.success("Documento enviado a Google Drive con éxito")
 
                 st.subheader("Vista previa del documento final:")
-                img_preview_after = render_preview(pdf_final_io.getvalue())
-                st.image(img_preview_after, use_container_width=True)
+                st.image(render_preview(pdf_final_io.getvalue()), use_container_width=True)
 
                 st.download_button(
-                    label="Descargar Documento",
-                    data=pdf_final_io,
-                    file_name=f"{nombre_pdf}.pdf",
-                    mime="application/pdf"
+                    label="Descargar Documento Firmado", data=pdf_final_io,
+                    file_name=f"{nombre_pdf}.pdf", mime="application/pdf"
                 )
 
 st.markdown("""
