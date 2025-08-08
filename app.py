@@ -9,7 +9,7 @@ from googleapiclient.http import MediaIoBaseUpload
 import datetime
 
 # ====== PARÁMETROS FIJOS PARA LA FOTO (BACKEND) ======
-PHOTO_JPEG_QUALITY = 18   # más bajo = más compresión
+PHOTO_JPEG_QUALITY = 75   # calidad óptima
 PHOTO_MAX_SIDE_PX = 720   # redimensiona el lado mayor
 PHOTO_WIDTH_PT = 400      # ancho en el PDF (pt)
 
@@ -70,19 +70,17 @@ with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
 with st.expander("📷 Foto del Recinto ", expanded=False):
     st.markdown("Toma la foto aquí Pasos:")
     st.markdown("1-Cambia la dirección de la cámara.")
-    st.markdown(" 2-Presiona el boton **Take Photo**.")
-    st.markdown(" 3-Listo.")
+    st.markdown("2-Presiona el botón **Take Photo**.")
+    st.markdown("3-Listo.")
     cam_photo = st.camera_input("Usa la cámara del dispositivo", key="cam_recinto")
 
-    # Preview de la cámara
     if cam_photo is not None:
         st.image(cam_photo, caption="Preview (cámara)", use_container_width=True)
 
 # ================= HELPER: COMPRIMIR IMAGEN (BACKEND) ====================
 def comprimir_imagen(file_bytes, max_lado=PHOTO_MAX_SIDE_PX, calidad=PHOTO_JPEG_QUALITY):
     """
-    Redimensiona (lado mayor <= max_lado) y comprime a JPEG.
-    Sin controles en UI; parámetros fijos arriba.
+    Redimensiona (lado mayor <= max_lado) y comprime a JPEG con calidad fija.
     """
     img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
     w, h = img.size
@@ -113,7 +111,7 @@ def insertar_firma_y_texto_en_pdf(
     Inserta firma, textos y opcionalmente una foto (con rótulo de fecha/hora).
     """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    pagina = doc[-1]  # última página
+    pagina = doc[-1]
 
     def insertar_dato_campo(etiqueta, texto, offset_x=5, offset_y=4):
         resultados = pagina.search_for(etiqueta)
@@ -167,33 +165,30 @@ def insertar_firma_y_texto_en_pdf(
         pagina.insert_textbox(textbox_rect, observacion.strip(), fontsize=10, fontname="helv", align=0, fill=(0, 0, 0))
         y_obs_base = textbox_rect.y1
 
-    # Foto (opcional)
+    # Foto
     if foto_jpeg_bytes is not None:
         try:
             img_tmp = Image.open(io.BytesIO(foto_jpeg_bytes))
             wpx, hpx = img_tmp.size
             ratio = hpx / wpx if wpx else 1
-            margen = 36  # 0.5"
+            margen = 36
             page_width = pagina.rect.width
             page_height = pagina.rect.height
             ancho_pt = max(min(foto_ancho_pt, page_width - 2 * margen), 120)
             alto_pt = ancho_pt * ratio
 
-            # posición preferida
             if y_obs_base is not None:
-                y_start = y_obs_base + 26  # espacio para el rótulo
+                y_start = y_obs_base + 26
             elif cedible_box:
                 y_start = cedible_box[0].y1 + 34
             else:
                 y_start = page_height * 0.55
 
             x_left = max((page_width - ancho_pt) / 2, margen)
-            x_right = min(x_left + ancho_pt, page_width - margen)
-            ancho_pt_real = x_right - x_left
+            ancho_pt_real = ancho_pt
             alto_pt_real = ancho_pt_real * ratio
 
-            # rótulo
-            etiqueta = f"Foto del recinto — {fecha_hora_foto}" if fecha_hora_foto else "Foto del recinto"
+            etiqueta = f"Foto del recinto — capturada el {fecha_hora_foto}" if fecha_hora_foto else "Foto del recinto"
             pagina.insert_text((x_left, y_start - 12), etiqueta, fontsize=10, fontname="helv", fill=(0, 0, 0))
 
             if y_start + alto_pt_real + margen <= page_height:
@@ -210,7 +205,6 @@ def insertar_firma_y_texto_en_pdf(
         except Exception as e:
             print("Error insertando foto en PDF:", e)
 
-    # Salida
     output = io.BytesIO()
     doc.save(output)
     doc.close()
@@ -258,10 +252,8 @@ if pdf_bytes is not None:
         elif not (nombre and recinto and fecha and rut and st.session_state.get("numero_guia", "")):
             st.warning("⚠️ Completa todos los campos del formulario.")
         else:
-            # bytes de la foto: solo cámara
             foto_bytes_raw = cam_photo.getvalue() if cam_photo is not None else None
 
-            # comprimir (backend, fijo)
             foto_jpeg_bytes = None
             if foto_bytes_raw is not None:
                 try:
@@ -272,7 +264,6 @@ if pdf_bytes is not None:
 
             fecha_hora_foto = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
-            # construir PDF final
             pdf_final_io = insertar_firma_y_texto_en_pdf(
                 pdf_bytes=pdf_bytes, firma_img=signature_img, nombre=nombre, recinto=recinto,
                 fecha_str=fecha_str, rut=rut, observacion=observacion, firma_width=120,
@@ -297,5 +288,6 @@ st.markdown("""
 ---
 <center style='color: gray;'>Desarrollado por Ingefix 2025</center>
 """, unsafe_allow_html=True)
+
 
 
