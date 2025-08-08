@@ -1,7 +1,7 @@
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
-import io
+import io, re
 import fitz  # PyMuPDF
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -27,24 +27,53 @@ with st.expander("🧾 **Formulario Cliente**", expanded=True):
     fecha_str = fecha.strftime("%d-%m-%Y")
     rut = st.text_input("RUT")
 
+# ---------- Helper: extraer Nº de Guía del PDF ----------
+def extraer_numero_guia(pdf_bytes):
+    """
+    Busca patrones como: 'Nº 123456', 'N°123456', 'No 123456'.
+    Devuelve el número (solo dígitos) o None.
+    """
+    patron = re.compile(r"(?:Nº|N°|No|N\.o|Nro\.?)\s*([0-9]{5,8})", re.IGNORECASE)
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        for page in doc:
+            texto = page.get_text()
+            m = patron.search(texto)
+            if m:
+                doc.close()
+                return m.group(1)
+        doc.close()
+    except Exception:
+        pass
+    return None
+
+# Guardamos bytes y detectamos Nº guía ANTES de crear el input
+pdf_bytes = None
+if pdf_file is not None:
+    pdf_bytes = pdf_file.read()
+    numero_detectado = extraer_numero_guia(pdf_bytes)
+    if numero_detectado:
+        st.session_state["numero_guia"] = numero_detectado
+
 # ========== FORMULARIO CHOFER / DESPACHADOR ==========
 with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
     observacion = st.text_area("Observación")
     iniciales_chofer = st.selectbox("Iniciales del Chofer", ["MOC", "BFS", "MFV"])
-    numero_guia = st.text_input("Número de la Guía", "")
-    nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
+    numero_guia = st.text_input(
+        "Número de la Guía",
+        value=st.session_state.get("numero_guia", ""),
+        key="numero_guia"
+    )
+    nombre_pdf = f"GS {numero_guia} {iniciales_chofer}".strip()
 
-# ========== FOTO DEL RECINTO (OPCIONAL) ==========
+# ========== FOTO DEL RECINTO (SOLO CÁMARA) ==========
 with st.expander("📷 Foto del Recinto (opcional)", expanded=False):
-    st.markdown("Puedes **subir una foto** o **tomarla con la cámara**. (Se comprime automáticamente con calidad fija en el backend).")
-    foto_file = st.file_uploader("Sube una foto (JPG/PNG)", type=["jpg", "jpeg", "png"], key="foto_recinto")
-    cam_photo = st.camera_input("O toma la foto aquí (usa la cámara del dispositivo)", key="cam_recinto")
+    st.markdown("Toma la foto aquí. Se comprimirá automáticamente con calidad fija en el backend.")
+    cam_photo = st.camera_input("Usa la cámara del dispositivo", key="cam_recinto")
 
-    # Preview (prioridad a la cámara)
+    # Preview de la cámara
     if cam_photo is not None:
         st.image(cam_photo, caption="Preview (cámara)", use_container_width=True)
-    elif foto_file is not None:
-        st.image(foto_file, caption="Preview (archivo)", use_container_width=True)
 
 # ================= HELPER: COMPRIMIR IMAGEN (BACKEND) ====================
 def comprimir_imagen(file_bytes, max_lado=PHOTO_MAX_SIDE_PX, calidad=PHOTO_JPEG_QUALITY):
@@ -206,9 +235,7 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     return archivo.get("id")
 
 # ================= UI PRINCIPAL ====================
-if pdf_file is not None:
-    pdf_bytes = pdf_file.read()
-
+if pdf_bytes is not None:
     st.subheader("Vista previa del documento original:")
     st.image(render_preview(pdf_bytes), use_container_width=True)
 
@@ -225,11 +252,11 @@ if pdf_file is not None:
     if st.button("Firmar Documento"):
         if signature_img is None:
             st.warning("⚠️ Dibuja tu firma primero.")
-        elif not (nombre and recinto and fecha and rut and numero_guia):
+        elif not (nombre and recinto and fecha and rut and st.session_state.get("numero_guia", "")):
             st.warning("⚠️ Completa todos los campos del formulario.")
         else:
-            # bytes de la foto: cámara > archivo
-            foto_bytes_raw = cam_photo.getvalue() if cam_photo is not None else (foto_file.read() if foto_file is not None else None)
+            # bytes de la foto: solo cámara
+            foto_bytes_raw = cam_photo.getvalue() if cam_photo is not None else None
 
             # comprimir (backend, fijo)
             foto_jpeg_bytes = None
@@ -252,7 +279,7 @@ if pdf_file is not None:
             if pdf_final_io:
                 st.success("✅ Documento firmado y foto incrustada correctamente.")
                 with st.spinner("Subiendo a Google Drive..."):
-                    subir_a_drive(f"{nombre_pdf}.pdf", pdf_final_io)
+                    subir_a_drive(f"GS {st.session_state['numero_guia']} {iniciales_chofer}.pdf", pdf_final_io)
                 st.success("Documento enviado a Google Drive con éxito")
 
                 st.subheader("Vista previa del documento final:")
@@ -260,11 +287,12 @@ if pdf_file is not None:
 
                 st.download_button(
                     label="Descargar Documento Firmado", data=pdf_final_io,
-                    file_name=f"{nombre_pdf}.pdf", mime="application/pdf"
+                    file_name=f"GS {st.session_state['numero_guia']} {iniciales_chofer}.pdf", mime="application/pdf"
                 )
 
 st.markdown("""
 ---
 <center style='color: gray;'>Desarrollado por Ingefix 2025</center>
 """, unsafe_allow_html=True)
+
 
