@@ -29,6 +29,54 @@ with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
     numero_guia = st.text_input("Número de la Guía", "")
     nombre_pdf = f"GS {numero_guia} {iniciales_chofer}"
 
+# ========== FOTO DEL RECINTO (OPCIONAL) ==========
+with st.expander("📷 Foto del Recinto (opcional)", expanded=False):
+    foto_file = st.file_uploader(
+        "Sube una foto (JPG/PNG)", type=["jpg", "jpeg", "png"], key="foto_recinto"
+    )
+    calidad = st.slider(
+        "Calidad JPEG",
+        min_value=5,
+        max_value=50,
+        value=25,
+        help="Menor = más compresión (menos KB)"
+    )
+    max_lado = st.select_slider(
+        "Máx. lado (px)",
+        options=[480, 720, 1024, 1280, 1600],
+        value=1024
+    )
+    if foto_file is not None:
+        st.image(foto_file, caption="Preview (original)", use_container_width=True)
+
+# ================= HELPER: COMPRIMIR IMAGEN ====================
+def comprimir_imagen(file_bytes, max_lado=1024, calidad=25):
+    """
+    - Redimensiona manteniendo aspecto hasta que el lado mayor sea <= max_lado
+    - Convierte a JPEG con alta compresión para pesar pocos KB
+    Devuelve un BytesIO listo para subir a Drive.
+    """
+    img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+
+    # Redimensionar manteniendo proporción si supera el máximo
+    w, h = img.size
+    scale = min(max_lado / max(w, h), 1.0)
+    if scale < 1.0:
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+    out = io.BytesIO()
+    # Subsampling 4:2:0 + progressive + optimize para apretar más
+    img.save(
+        out,
+        format="JPEG",
+        quality=int(calidad),
+        optimize=True,
+        subsampling="4:2:0",
+        progressive=True
+    )
+    out.seek(0)
+    return out
+
 # ================= FUNCIÓN PARA MODIFICAR EL PDF ====================
 def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=120):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -83,7 +131,12 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
 
         pagina.insert_text((x_inicio, y_obs + 5), texto_label, fontsize=11, fontname="helv", fill=(0, 0, 0))
 
-        textbox_rect = fitz.Rect(x_inicio + ancho_label + espacio, y_obs, x_inicio + ancho_label + espacio + ancho_campo, y_obs + alto_campo)
+        textbox_rect = fitz.Rect(
+            x_inicio + ancho_label + espacio,
+            y_obs,
+            x_inicio + ancho_label + espacio + ancho_campo,
+            y_obs + alto_campo
+        )
         pagina.draw_rect(textbox_rect, color=(0, 0, 0), width=0.5)
         pagina.insert_textbox(
             textbox_rect,
@@ -100,7 +153,6 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     output.seek(0)
     return output
 
-
 def render_preview(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]
@@ -111,18 +163,19 @@ def render_preview(pdf_bytes):
     doc.close()
     return img_data
 
-def subir_a_drive(nombre_archivo, contenido_pdf):
+# ================= SUBIDA A DRIVE (GENÉRICA) ====================
+def subir_a_drive(nombre_archivo, contenido_io, mime_type="application/pdf", parent_id="0AFh4pnUAC83dUk9PVA"):
     creds_info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(creds_info)
     servicio = build("drive", "v3", credentials=credentials)
 
     file_metadata = {
         "name": nombre_archivo,
-        "mimeType": "application/pdf",
-        "parents": ["0AFh4pnUAC83dUk9PVA"]
+        "mimeType": mime_type,
+        "parents": [parent_id],
     }
-    contenido_pdf.seek(0)
-    media = MediaIoBaseUpload(contenido_pdf, mimetype="application/pdf")
+    contenido_io.seek(0)
+    media = MediaIoBaseUpload(contenido_io, mimetype=mime_type)
     archivo = servicio.files().create(
         body=file_metadata,
         media_body=media,
@@ -131,7 +184,7 @@ def subir_a_drive(nombre_archivo, contenido_pdf):
     ).execute()
     return archivo.get("id")
 
-
+# ================= UI PRINCIPAL ====================
 if pdf_file is not None:
     pdf_bytes = pdf_file.read()
 
@@ -168,7 +221,19 @@ if pdf_file is not None:
                 st.success("✅ Documento firmado correctamente.")
 
                 with st.spinner("Subiendo a Google Drive..."):
-                    drive_id = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io)
+                    # Subir PDF
+                    drive_id_pdf = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io, mime_type="application/pdf")
+
+                    # Subir foto (si hay)
+                    if foto_file is not None:
+                        try:
+                            comprimida_io = comprimir_imagen(foto_file.read(), max_lado=max_lado, calidad=calidad)
+                            nombre_foto = f"GS {numero_guia} {iniciales_chofer} - FOTO RECINTO.jpg"
+                            drive_id_img = subir_a_drive(nombre_foto, comprimida_io, mime_type="image/jpeg")
+                            st.success("📷 Foto del recinto enviada a Google Drive con éxito.")
+                        except Exception as e:
+                            st.error(f"No se pudo subir la foto: {e}")
+
                 st.success("Documento enviado a Google Drive con éxito")
 
                 st.subheader("Vista previa del documento firmado:")
