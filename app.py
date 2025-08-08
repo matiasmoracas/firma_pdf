@@ -31,21 +31,11 @@ with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
 
 # ========== FOTO DEL RECINTO (OPCIONAL) ==========
 with st.expander("📷 Foto del Recinto (opcional)", expanded=False):
-    foto_file = st.file_uploader(
-        "Sube una foto (JPG/PNG)", type=["jpg", "jpeg", "png"], key="foto_recinto"
-    )
-    calidad = st.slider(
-        "Calidad JPEG",
-        min_value=5,
-        max_value=50,
-        value=25,
-        help="Menor = más compresión (menos KB)"
-    )
-    max_lado = st.select_slider(
-        "Máx. lado (px)",
-        options=[480, 720, 1024, 1280, 1600],
-        value=1024
-    )
+    foto_file = st.file_uploader("Sube una foto (JPG/PNG)", type=["jpg", "jpeg", "png"], key="foto_recinto")
+    calidad = st.slider("Calidad JPEG", 5, 50, 25, help="Menor = más compresión (menos KB)")
+    max_lado = st.select_slider("Máx. lado (px)", options=[480, 720, 1024, 1280, 1600], value=1024)
+    ancho_en_pdf = st.select_slider("Ancho de la foto en PDF (pt)", options=[240, 300, 360, 420], value=360,
+                                    help="1 pt ≈ 1/72 de pulgada. 360 pt ~ 12,7 cm")
     if foto_file is not None:
         st.image(foto_file, caption="Preview (original)", use_container_width=True)
 
@@ -54,7 +44,7 @@ def comprimir_imagen(file_bytes, max_lado=1024, calidad=25):
     """
     - Redimensiona manteniendo aspecto hasta que el lado mayor sea <= max_lado
     - Convierte a JPEG con alta compresión para pesar pocos KB
-    Devuelve un BytesIO listo para subir a Drive.
+    Devuelve BytesIO (JPEG) listo para incrustar en PDF.
     """
     img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
 
@@ -65,20 +55,28 @@ def comprimir_imagen(file_bytes, max_lado=1024, calidad=25):
         img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
 
     out = io.BytesIO()
-    # Subsampling 4:2:0 + progressive + optimize para apretar más
-    img.save(
-        out,
-        format="JPEG",
-        quality=int(calidad),
-        optimize=True,
-        subsampling="4:2:0",
-        progressive=True
-    )
+    img.save(out, format="JPEG", quality=int(calidad), optimize=True, subsampling="4:2:0", progressive=True)
     out.seek(0)
     return out
 
 # ================= FUNCIÓN PARA MODIFICAR EL PDF ====================
-def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_str, rut, observacion, firma_width=120):
+def insertar_firma_y_texto_en_pdf(
+    pdf_bytes,
+    firma_img,
+    nombre,
+    recinto,
+    fecha_str,
+    rut,
+    observacion,
+    firma_width=120,
+    foto_jpeg_bytes=None,
+    foto_ancho_pt=360,
+):
+    """
+    Si 'foto_jpeg_bytes' viene, inserta la foto:
+      - Primero intenta debajo de la sección 'Observación:' en la última página.
+      - Si no hay espacio suficiente, agrega una nueva página y la centra arriba.
+    """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[-1]  # última página
 
@@ -95,6 +93,7 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
     insertar_dato_campo("RUT:", rut, offset_x=5, offset_y=4)
     insertar_dato_campo("Fecha:", fecha_str, offset_x=20, offset_y=8)
 
+    # Firma
     firma_box = pagina.search_for("Firma")
     if firma_box:
         rect = firma_box[0]
@@ -113,6 +112,8 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
         firma_rect = fitz.Rect(x, y, x + firma_width, y + h_escala)
         pagina.insert_image(firma_rect, stream=img_bytes)
 
+    # Observación
+    y_obs_base = None
     cedible_box = pagina.search_for("CEDIBLE")
     if cedible_box and observacion.strip():
         cbox = cedible_box[0]
@@ -146,7 +147,58 @@ def insertar_firma_y_texto_en_pdf(pdf_bytes, firma_img, nombre, recinto, fecha_s
             align=0,
             fill=(0, 0, 0)
         )
+        y_obs_base = textbox_rect.y1  # parte baja del recuadro de observación
 
+    # Foto (opcional) — intentamos en la última página
+    if foto_jpeg_bytes is not None:
+        try:
+            # Calcula alto manteniendo aspecto a partir del ancho deseado (en pt)
+            img_tmp = Image.open(io.BytesIO(foto_jpeg_bytes))
+            wpx, hpx = img_tmp.size
+            ratio = hpx / wpx if wpx else 1
+            alto_pt = foto_ancho_pt * ratio
+
+            margen = 36  # 0.5"
+            page_width = pagina.rect.width
+            page_height = pagina.rect.height
+
+            # Posición preferida: debajo de observación si existe, sino debajo de 'CEDIBLE', sino centro/abajo
+            y_start = None
+            if y_obs_base is not None:
+                y_start = y_obs_base + 12
+            elif cedible_box:
+                y_start = cedible_box[0].y1 + 20
+            else:
+                y_start = page_height * 0.55  # aproximación si no hay anclaje
+
+            # Centrado horizontal
+            x_left = max((page_width - foto_ancho_pt) / 2, margen)
+            x_right = min(x_left + foto_ancho_pt, page_width - margen)
+            # recalcula por si ajustamos a margen derecho
+            foto_ancho_pt_real = x_right - x_left
+            alto_pt_real = foto_ancho_pt_real * ratio
+
+            # ¿Cabe en esta página?
+            if y_start + alto_pt_real + margen <= page_height:
+                target_rect = fitz.Rect(x_left, y_start, x_left + foto_ancho_pt_real, y_start + alto_pt_real)
+                pagina.insert_image(target_rect, stream=foto_jpeg_bytes)
+            else:
+                # Crear nueva página y centrar arriba con márgenes
+                new_page = doc.new_page(-1)  # al final
+                pw, ph = new_page.rect.width, new_page.rect.height
+                x_left = max((pw - foto_ancho_pt) / 2, margen)
+                x_right = min(x_left + foto_ancho_pt, pw - margen)
+                foto_ancho_pt_real = x_right - x_left
+                alto_pt_real = foto_ancho_pt_real * ratio
+                y_top = margen
+                target_rect = fitz.Rect(x_left, y_top, x_left + foto_ancho_pt_real, y_top + alto_pt_real)
+                new_page.insert_image(target_rect, stream=foto_jpeg_bytes)
+
+        except Exception as e:
+            # No rompemos el flujo si falla la foto
+            print("Error insertando foto en PDF:", e)
+
+    # Salida
     output = io.BytesIO()
     doc.save(output)
     doc.close()
@@ -163,7 +215,7 @@ def render_preview(pdf_bytes):
     doc.close()
     return img_data
 
-# ================= SUBIDA A DRIVE (GENÉRICA) ====================
+# ================= SUBIDA A DRIVE (PDF ÚNICO) ====================
 def subir_a_drive(nombre_archivo, contenido_io, mime_type="application/pdf", parent_id="0AFh4pnUAC83dUk9PVA"):
     creds_info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(creds_info)
@@ -214,35 +266,44 @@ if pdf_file is not None:
         elif not (nombre and recinto and fecha and rut and numero_guia):
             st.warning("⚠️ Completa todos los campos del formulario.")
         else:
-            pdf_firmado_io = insertar_firma_y_texto_en_pdf(
-                pdf_bytes, signature_img, nombre, recinto, fecha_str, rut, observacion
+            # Comprimir foto si viene
+            foto_jpeg_bytes = None
+            if foto_file is not None:
+                try:
+                    foto_jpeg_io = comprimir_imagen(foto_file.read(), max_lado=max_lado, calidad=calidad)
+                    foto_jpeg_bytes = foto_jpeg_io.getvalue()
+                    st.info(f"Foto comprimida lista para incrustar (≈ {len(foto_jpeg_bytes)//1024} KB).")
+                except Exception as e:
+                    st.error(f"No se pudo comprimir la foto: {e}")
+
+            # Construir PDF final (firma + textos + foto incrustada)
+            pdf_final_io = insertar_firma_y_texto_en_pdf(
+                pdf_bytes=pdf_bytes,
+                firma_img=signature_img,
+                nombre=nombre,
+                recinto=recinto,
+                fecha_str=fecha_str,
+                rut=rut,
+                observacion=observacion,
+                firma_width=120,
+                foto_jpeg_bytes=foto_jpeg_bytes,
+                foto_ancho_pt=ancho_en_pdf,
             )
-            if pdf_firmado_io:
-                st.success("✅ Documento firmado correctamente.")
 
-                with st.spinner("Subiendo a Google Drive..."):
-                    # Subir PDF
-                    drive_id_pdf = subir_a_drive(f"{nombre_pdf}.pdf", pdf_firmado_io, mime_type="application/pdf")
+            if pdf_final_io:
+                st.success("✅ Documento firmado y foto incrustada correctamente.")
 
-                    # Subir foto (si hay)
-                    if foto_file is not None:
-                        try:
-                            comprimida_io = comprimir_imagen(foto_file.read(), max_lado=max_lado, calidad=calidad)
-                            nombre_foto = f"GS {numero_guia} {iniciales_chofer} - FOTO RECINTO.jpg"
-                            drive_id_img = subir_a_drive(nombre_foto, comprimida_io, mime_type="image/jpeg")
-                            st.success("📷 Foto del recinto enviada a Google Drive con éxito.")
-                        except Exception as e:
-                            st.error(f"No se pudo subir la foto: {e}")
+                with st.spinner("Subiendo PDF a Google Drive..."):
+                    drive_id_pdf = subir_a_drive(f"{nombre_pdf}.pdf", pdf_final_io, mime_type="application/pdf")
+                st.success("📄 PDF enviado a Google Drive con éxito.")
 
-                st.success("Documento enviado a Google Drive con éxito")
-
-                st.subheader("Vista previa del documento firmado:")
-                img_preview_after = render_preview(pdf_firmado_io.getvalue())
+                st.subheader("Vista previa del documento final:")
+                img_preview_after = render_preview(pdf_final_io.getvalue())
                 st.image(img_preview_after, use_container_width=True)
 
                 st.download_button(
-                    label="Descargar Documento Firmado",
-                    data=pdf_firmado_io,
+                    label="Descargar Documento",
+                    data=pdf_final_io,
                     file_name=f"{nombre_pdf}.pdf",
                     mime="application/pdf"
                 )
