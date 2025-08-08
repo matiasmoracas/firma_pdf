@@ -7,11 +7,11 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import datetime
-from zoneinfo import ZoneInfo  # <-- para hora de Chile
+from zoneinfo import ZoneInfo  # hora de Chile
 
-# ====== PARÁMETROS DE PRESENTACIÓN ======
-PHOTO_WIDTH_PT = 400      # ancho en el PDF (pt)
-CHILE_TZ = ZoneInfo("America/Santiago")  # zona horaria Chile
+# ====== PARÁMETROS ======
+PHOTO_WIDTH_PT = 400                 # ancho de la foto en el PDF (pt)
+CHILE_TZ = ZoneInfo("America/Santiago")
 
 st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
 st.title("Gestor de firmas Guías Ingefix")
@@ -66,17 +66,14 @@ with st.expander("🚚 **Formulario Chofer / Despachador**", expanded=True):
     )
     nombre_pdf = f"GS {numero_guia} {iniciales_chofer}".strip()
 
-# ========== FOTO DEL RECINTO (SOLO CÁMARA) ==========
+# ========== FOTO DEL RECINTO (SUBIDA DE ARCHIVO) ==========
 with st.expander("📷 Foto del Recinto", expanded=False):
-    st.markdown("Toma la foto aquí Pasos:")
-    st.markdown("1- Cambia la dirección de la cámara si corresponde.")
-    st.markdown("2- Presiona el botón **Take Photo**.")
-    st.markdown("3- Listo.")
-    cam_photo = st.camera_input("Usa la cámara del dispositivo", key="cam_recinto")
+    st.markdown("Sube una foto del recinto (JPG o PNG). Se insertará en el PDF con sello de fecha/hora (zona Chile).")
+    foto_file = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"], key="foto_recinto")
 
-    # Preview de la cámara (solo para la UI; no se escribe en el PDF)
-    if cam_photo is not None:
-        st.image(cam_photo, caption="Preview (cámara)", use_container_width=True)
+    # Preview (opcional) solo si se sube
+    if foto_file is not None:
+        st.image(foto_file, caption="Preview de la foto subida", use_container_width=True)
 
 # ================= FUNCIÓN PARA MODIFICAR EL PDF ====================
 def insertar_firma_y_texto_en_pdf(
@@ -180,7 +177,7 @@ def insertar_firma_y_texto_en_pdf(
                 etiqueta = f"Foto del recinto — capturada el {fecha_hora_foto}"
                 pagina.insert_text((x_left, y_start - 12), etiqueta, fontsize=10, fontname="helv", fill=(0, 0, 0))
 
-            # Insertar imagen tal cual
+            # Insertar imagen tal cual (sin recomprimir)
             if y_start + alto_pt_real + margen <= page_height:
                 target_rect = fitz.Rect(x_left, y_start, x_left + ancho_pt_real, y_start + alto_pt_real)
                 pagina.insert_image(target_rect, stream=foto_bytes)
@@ -244,8 +241,8 @@ if pdf_bytes is not None:
         elif not (nombre and recinto and fecha and rut and st.session_state.get("numero_guia", "")):
             st.warning("⚠️ Completa todos los campos del formulario.")
         else:
-            # bytes de la foto: solo cámara, sin compresión
-            foto_bytes_raw = cam_photo.getvalue() if cam_photo is not None else None
+            # bytes de la foto: archivo subido (sin compresión)
+            foto_bytes_raw = foto_file.getvalue() if foto_file is not None else None
 
             # Fecha/hora con zona de Chile (solo para el rótulo en la foto)
             fecha_hora_foto = datetime.datetime.now(tz=CHILE_TZ).strftime("%d-%m-%Y %H:%M:%S")
@@ -275,6 +272,4 @@ st.markdown("""
 ---
 <center style='color: gray;'>Desarrollado por Ingefix 2025</center>
 """, unsafe_allow_html=True)
-
-
 
