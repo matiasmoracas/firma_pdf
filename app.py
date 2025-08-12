@@ -16,6 +16,66 @@ CHILE_TZ = ZoneInfo("America/Santiago")
 st.set_page_config(page_title="Firmas Guías de Salida Ingefix", layout="centered")
 st.title("Gestor de firmas Guías Ingefix")
 
+# ----------------------------------------------------------------------
+# ======================= RUT: helpers (NUEVO) =========================
+# ----------------------------------------------------------------------
+def _clean_rut(rut: str) -> str:
+    """Quita todo excepto dígitos y K/k; devuelve en minúsculas."""
+    return re.sub(r"[^0-9kK]", "", (rut or "")).lower()
+
+def _calc_dv(num: str) -> str:
+    """Calcula dígito verificador usando módulo 11 (pesos 2..7)."""
+    s = 0
+    mult = 2
+    for d in reversed(num):
+        s += int(d) * mult
+        mult = 2 if mult == 7 else mult + 1
+    r = 11 - (s % 11)
+    if r == 11: return "0"
+    if r == 10: return "k"
+    return str(r)
+
+def _format_miles(cuerpo: str) -> str:
+    """Agrega puntos de miles al cuerpo del RUT."""
+    if not cuerpo:
+        return ""
+    partes = []
+    while len(cuerpo) > 3:
+        partes.insert(0, cuerpo[-3:])
+        cuerpo = cuerpo[:-3]
+    if cuerpo:
+        partes.insert(0, cuerpo)
+    return ".".join(partes)
+
+def format_rut(rut: str) -> str:
+    """Devuelve el RUT con puntos y guion (ej: 12.345.678-9)."""
+    rut = _clean_rut(rut)
+    if not rut:
+        return ""
+    if len(rut) == 1:
+        # Solo DV o un dígito aún; no formatear
+        return rut
+    cuerpo, dv = rut[:-1], rut[-1]
+    if not cuerpo.isdigit():
+        return rut  # incompleto; no formatear aún
+    return f"{_format_miles(cuerpo)}-{dv}"
+
+def validate_rut(rut: str) -> bool:
+    """Valida el RUT con su DV."""
+    rut = _clean_rut(rut)
+    if len(rut) < 2 or not rut[:-1].isdigit():
+        return False
+    cuerpo, dv = rut[:-1], rut[-1]
+    return _calc_dv(cuerpo) == dv
+
+def rut_on_change():
+    """Callback: toma lo escrito y lo deja formateado en vivo."""
+    raw = st.session_state.get("rut_raw", "")
+    formatted = format_rut(raw)
+    st.session_state["rut"] = formatted
+    st.session_state["rut_raw"] = formatted
+# ----------------------------------------------------------------------
+
 # Subir PDF
 pdf_file = st.file_uploader("Sube La Guía de Salida", type=["pdf"])
 
@@ -25,7 +85,14 @@ with st.expander("🧾 **Formulario Cliente**", expanded=True):
     recinto = st.text_input("Recinto")
     fecha = st.date_input("Fecha", value=datetime.date.today())
     fecha_str = fecha.strftime("%d-%m-%Y")
-    rut = st.text_input("RUT")
+
+    # -------- RUT con formateo automático (NUEVO) --------
+    st.text_input("RUT", key="rut_raw", on_change=rut_on_change, placeholder="12.345.678-9")
+    rut = st.session_state.get("rut", st.session_state.get("rut_raw", ""))
+
+    # Mensaje de validación (opcional)
+    if rut and not validate_rut(rut):
+        st.caption("⚠️ RUT inválido (revisa dígito verificador).")
 
 # ---------- Helper: extraer Nº de Guía del PDF ----------
 def extraer_numero_guia(pdf_bytes):
@@ -236,12 +303,19 @@ if pdf_bytes is not None:
         signature_img = Image.fromarray((canvas_result.image_data).astype("uint8"))
 
     if st.button("Firmar Documento"):
+        # Validaciones incluyendo RUT
         if signature_img is None:
             st.warning("⚠️ Dibuja tu firma primero.")
         elif not (nombre and recinto and fecha and rut and st.session_state.get("numero_guia", "")):
             st.warning("⚠️ Completa todos los campos del formulario.")
+        elif not validate_rut(rut):
+            st.warning("⚠️ El RUT no es válido.")
         else:
             # bytes de la foto: archivo subido (sin compresión)
+            foto_bytes_raw = foto_file.getvalue() if ('foto_recinto' in st.session_state and st.session_state['foto_recinto']) else (foto_file.getvalue() if 'foto_file' in locals() and foto_file is not None else (foto_file.getvalue() if foto_file is not None else None))
+            # más simple/robusto:
+            foto_bytes_raw = foto_file.getvalue() if 'foto_file' in locals() and foto_file is not None else (foto_file.getvalue() if 'foto_recinto' in st.session_state and st.session_state['foto_recinto'] else (foto_file.getvalue() if foto_file is not None else None))
+            # y finalmente:
             foto_bytes_raw = foto_file.getvalue() if foto_file is not None else None
 
             # Fecha/hora con zona de Chile (solo para el rótulo en la foto)
